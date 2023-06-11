@@ -102,39 +102,43 @@ head(WTO)
 WTO %>%
   mutate(y = -log10(pval.adj-abs(wTO))) %>%
   ggplot(aes(color =  pval.adj)) + 
-  facet_grid(~ )
+  facet_grid(~ Tissue) +
   geom_point(aes(x = wTO, y = y), alpha = 0.5) +
   ggsci::scale_color_gsea(reverse = T) +
-  labs(x = 'Correlation',   
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
+  labs(x = 'Correlation (Tau)',   
     y = expression(~Log[10]~('p.adj'))) +
   theme_bw(base_size = 16, base_family = "GillSans")
 
-wTOout %>%
+WTO %>%
   mutate(y = -log10(pval.adj-abs(wTO))) %>%
   drop_na(y) %>% mutate(g = sign(wTO)) %>%
+  group_by(Tissue) %>%
   count(g) 
 
 # Most biological networks show a power-law degree distribution, where a few nodes have a very large number of connections, while other nodes have no or few connections
 
 # Positive correlations in co-occurence networks may represent symbiotic or commensal relationships, while negative correlations may represent predator-prey interactions, allelopathy or competition for limited resources.
 
-wTOout %>%
+WTO %>%
   mutate(y = abs(wTO)) %>% 
   ggplot(aes(y, color = as.factor(sign(wTO)))) + 
   geom_histogram()
   # stat_ecdf()
 
-wTOout %>%
+WTO %>%
   mutate(y = pval.adj) %>% 
   ggplot(aes(y)) + 
   geom_histogram() +
-  geom_vline(xintercept = 0.05, linetype = "dashed")
+  facet_grid(~ Tissue) +
+  geom_vline(xintercept = 0.05, linetype = "dashed") +
+  theme_bw(base_size = 16, base_family = "GillSans")
 
 
-wTOout <- wTOout %>% filter(pval.adj < 0.05)
+WTO <- WTO %>% filter(pval.adj < 0.05)
 
-Node.1 = as.character(wTOout$Node.1)
-Node.2 = as.character(wTOout$Node.2)
+Node.1 = as.character(WTO$Node.1)
+Node.2 = as.character(WTO$Node.2)
 
 length(sort(unique(c(Node.1,Node.2))))
 
@@ -211,7 +215,7 @@ exportNet <- function(WTO, infoNodes = TAX, cutoff = 0.05, tau = 0.5) {
   
 }
 
-exportNet(wTOout, cutoff = 0, tau = 0) -> graph
+exportNet(WTO, cutoff = 0, tau = 0.2) -> graph
 
 # graph %>%  
 #   activate("edges") %>% 
@@ -225,7 +229,7 @@ igraph::components(graph)
 # viz
 
 graph %>% 
-  activate("nodes") %>% 
+  activate("nodes") %>%
   mutate(betweenness = betweenness(.),
     pageRank = page_rank(.)$vector) %>%
   as_data_frame(., "vertices") %>%
@@ -240,12 +244,18 @@ graph %>%
 
 graph %>%
   activate("edges") %>% 
-  mutate(wTO = ifelse(pval.adj-abs(wTO) < 0.05, wTO, 0)) %>%
-  filter(wTO > 0) -> g
+  # mutate(wTO = ifelse(pval.adj-abs(wTO) < 0.05, wTO, 0)) %>%
+  mutate(wTO = ifelse(abs(wTO) < 0.05, wTO, 0)) %>%
+  filter(abs(wTO) > 0) -> g
   
 g %>% activate("nodes") %>% 
     mutate(degree = degree(.)) %>% 
-  filter(degree > 0) -> g
+  filter(degree > 0) %>%
+  mutate(betweenness = betweenness(.),
+    pageRank = page_rank(.)$vector) %>%
+  mutate(unique = ifelse(pageRank > 0.005, unique, NA)) -> g
+
+# g %>% as_data_frame(., "vertices") %>% drop_na(unique)
 
 names <- g %>% activate("nodes") %>% distinct(Phylum) %>% pull()
 
@@ -282,6 +292,12 @@ ggraph(layout) +
     alpha = 0.25)  +
   guides(fill = FALSE) -> psaveNet
 
+
+psaveNet +
+  geom_node_point(aes(size = pageRank, color = Phylum)) +
+  geom_node_text(aes(label = unique), repel = T) 
+  # facet_edges(~as.factor(Tissue))
+    
 psaveNet +
   geom_edge_link(aes(color = typeEdge, alpha = abs(wTO)), # edge_width = betweenness
     arrow = arrow(
