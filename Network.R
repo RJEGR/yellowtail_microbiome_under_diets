@@ -109,24 +109,56 @@ table(DiffNet$Group)
 
 ps <- ps %>% subset_samples(Time != 60)
 
-table(sample_data(ps)$Tissue)
+table(sample_data(ps)$Treatment)
 
-ps1 <- ps %>% subset_samples(Tissue == "Foregut")
+# ps1 <- ps %>% subset_samples(Tissue == "Foregut")
 
-ps2 <- ps %>% subset_samples(Tissue == "Hindgut")
+# ps2 <- ps %>% subset_samples(Tissue == "Hindgut")
+
+# ps1 <- ps %>% subset_samples(Treatment == "CD")
+
+# ps2 <- ps %>% subset_samples(Treatment == "CD+10%")
+
+
+# MAKE COMPARISON BY TREATMENTS ====
+
+treatment <- levels(sample_data(ps)$Treatment)
+
+out <- list()
+
+for(i in 1:length(treatment)) {
+  
+  filt <- treatment[i]
+  
+  print(filt)
+  
+  pys <- ps %>% subset_samples(Treatment == filt)
+  
+  out[[i]] <- pys %>% from_pyseq_to_wTO(n = 100)
+  
+}
+
+names(out) <- treatment
+
+
+
 
 wTO1 <- ps1 %>% from_pyseq_to_wTO(n = 50)
 
 wTO2 <- ps2 %>% from_pyseq_to_wTO(n = 50)
 
-DiffNet <- CoDiNA::MakeDiffNet(Data = list(wTO1,wTO2), Code = c('Foregut', 'Hindgut') )
+DiffNet <- CoDiNA::MakeDiffNet(Data = list(wTO1,wTO2), Code = c('CD', 'CD+10%') )
 
-plot(DiffNet)
+# Continue tissue comparison =====
 
+# head(sample_data(ps))
 
+# cd10 <- ps %>% subset_samples(Treatment == "CD+10%")
+# 
+# cd10 %>% from_pyseq_to_wTO(n = 50)
 
-wTO1 <- wTO1 %>% mutate(Tissue = "Foregut")
-wTO2 <- wTO2 %>% mutate(Tissue = "Hindgut")
+wTO1 <- wTO1 %>% mutate(Treatment == "CD")
+wTO2 <- wTO2 %>% mutate(Treatment == "CD+10%")
 
 WTO <- rbind(wTO1, wTO2 )
 
@@ -329,6 +361,8 @@ g %>% activate("edges") %>%
   mutate(betweenness = edge.betweenness(.)) -> g
 
 # PREPARE LAYOUT TO DATAVIZ
+
+g %>% as_data_frame(., "vertices") %>% view()
 
 layout = create_layout(g, layout = 'igraph', algorithm = 'kk')
 
